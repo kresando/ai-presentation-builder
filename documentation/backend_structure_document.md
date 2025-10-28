@@ -1,179 +1,179 @@
-# Backend Structure Document
-
-This document outlines the backend architecture, hosting, and infrastructure for the **codeguide-starter** project. It uses plain language so anyone can understand how the backend is set up and how it supports the application.
+# AI Presentation Builder Backend Structure Document
 
 ## 1. Backend Architecture
 
-- **Framework and Design Pattern**
-  - We use **Next.js API Routes** to handle all server-side logic. These routes live alongside the frontend code in the same repository, making development and deployment simpler.
-  - The backend follows a **layered pattern**:
-    1. **API Layer**: Receives requests (login, registration, data fetch).  
-    2. **Service Layer**: Contains the core business logic (user validation, password hashing).  
-    3. **Data Access Layer**: Talks to the database via a simple ORM (e.g., Prisma or TypeORM).
+We’ve built the backend using Next.js API routes on a Node.js runtime, following a clear Backend-for-Frontend (BFF) pattern. Key points:
 
-- **Scalability**
-  - Stateless API routes can scale horizontally—new instances can spin up on demand.  
-  - We can add caching or a message queue (e.g., Redis or RabbitMQ) without changing the core code.
+- The Next.js App Router handles both page rendering and serverless API endpoints in one codebase.  
+- We keep business logic on the server side to protect API keys and simplify data flows.  
+- Drizzle ORM sits between our API routes and the database, offering type-safe queries and migrations.  
 
-- **Maintainability**
-  - Code for each feature is grouped by route (authentication, dashboard).  
-  - A service layer separates complex logic from request handling.
+This setup supports:
 
-- **Performance**
-  - Lightweight Node.js handlers keep response times low.  
-  - Future use of database connection pooling and Redis for caching repeated queries.
+- **Scalability:** Serverless functions on Vercel automatically scale up or down based on demand.  
+- **Maintainability:** Clear separation of API routes, services (like `lib/gemini.ts`), and database schema files keeps our code organized.  
+- **Performance:** Using Next.js Server Components and caching headers we minimize data fetching work on the client side.
+
+---
 
 ## 2. Database Management
 
-- **Database Choice**
-  - We recommend **PostgreSQL** for structured data and reliable transactions.  
-  - In-memory caching can be added later with **Redis** for session tokens or frequently read data.
+We use PostgreSQL as our relational database, managed through Drizzle ORM:
 
-- **Data Storage and Access**
-  - Use an ORM like **Prisma** or **TypeORM** to map JavaScript/TypeScript objects to database tables.
-  - Connection pooling ensures efficient use of database connections under load.
-  - Migrations track schema changes over time, keeping development, staging, and production in sync.
+- **Type:** SQL (PostgreSQL)  
+- **ORM:** Drizzle offers a schema-first approach with TypeScript support.  
+- **Connection Pooling:** Managed by the Postgres driver with pooling settings tailored for serverless environments.  
+- **Migrations:** Drizzle handles schema changes via versioned migrations stored in the repo.  
 
-- **Data Practices**
-  - Passwords are never stored in plain text—they are salted and hashed with **bcrypt** before saving.
-  - All outgoing data is typed and validated to prevent malformed records.
+Data is organized in tables for users, presentations, and slides. We store structured slide content in a JSONB column for flexibility. All database credentials live in environment variables and are never checked into source control.
+
+---
 
 ## 3. Database Schema
 
-### Human-Readable Format
+### Overview (Human-Readable)
 
-- **Users**
-  - **id**: Unique identifier  
-  - **email**: User’s email address (unique)  
-  - **password_hash**: Securely hashed password  
-  - **created_at**: Account creation timestamp
-
-- **Sessions**
-  - **id**: Unique session record  
-  - **user_id**: Links to a user  
-  - **token**: Random string for authentication  
-  - **expires_at**: When the token stops working  
-  - **created_at**: When the session was created
-
-- **DashboardItems** *(optional for dynamic data)*
-  - **id**: Unique record  
-  - **title**: Item title  
-  - **content**: Item details  
-  - **created_at**: When the item was added
+- **users**: Holds each user’s account details (email, hashed password, timestamps).  
+- **presentations**: Tracks individual presentation metadata such as title, theme, creation date, and owner (user ID).  
+- **slides**: Contains the actual slide data for each presentation in a JSON format, with ordering info and a foreign key to the presentation.
 
 ### SQL Schema (PostgreSQL)
+
 ```sql
--- Users table
+-- users table (existing)
 CREATE TABLE users (
-  id SERIAL PRIMARY KEY,
-  email VARCHAR(255) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
+  id             SERIAL PRIMARY KEY,
+  email          TEXT UNIQUE NOT NULL,
+  hashed_password TEXT NOT NULL,
+  created_at     TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at     TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Sessions table
-CREATE TABLE sessions (
-  id SERIAL PRIMARY KEY,
-  user_id INT REFERENCES users(id) ON DELETE CASCADE,
-  token VARCHAR(255) UNIQUE NOT NULL,
-  expires_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now()
+-- presentations table
+CREATE TABLE presentations (
+  id             SERIAL PRIMARY KEY,
+  user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title          TEXT NOT NULL,
+  theme          TEXT NOT NULL DEFAULT 'default',
+  created_at     TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at     TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Dashboard items table
-CREATE TABLE dashboard_items (
-  id SERIAL PRIMARY KEY,
-  title TEXT NOT NULL,
-  content TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
+-- slides table
+CREATE TABLE slides (
+  id               SERIAL PRIMARY KEY,
+  presentation_id  INTEGER NOT NULL REFERENCES presentations(id) ON DELETE CASCADE,
+  slide_index      INTEGER NOT NULL,
+  content          JSONB NOT NULL,
+  created_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE (presentation_id, slide_index)
 );
-```  
+```
+
+---
 
 ## 4. API Design and Endpoints
 
-- **Approach**: We follow a **RESTful** style, grouping related endpoints under `/api` directories.
+We follow a RESTful approach using Next.js API routes.
 
-- **Key Endpoints**
-  - `POST /api/auth/register`  
-    • Accepts `{ email, password }`  
-    • Creates a new user and issues a session token  
-  - `POST /api/auth/login`  
-    • Accepts `{ email, password }`  
-    • Verifies credentials and returns a session token  
-  - `POST /api/auth/logout`  
-    • Invalidates the session token on the server  
-  - `GET /api/dashboard/data`  
-    • Requires a valid session  
-    • Returns user-specific data or dashboard items  
+- **Authentication Routes** (`/api/auth/...`)
+  - Handles sign-up, login, logout, session refresh via Better Auth.  
 
-- **Communication**
-  - Frontend sends JSON requests; backend replies with JSON and appropriate HTTP status codes.  
-  - Protected routes check for a valid session token (in cookies or Authorization header).
+- **Presentation Routes** (`/api/presentations`)
+  - `GET /api/presentations` – List all presentations for the current user.  
+  - `POST /api/presentations` – Create a new presentation record (metadata only).  
+  - `GET /api/presentations/[id]` – Fetch a single presentation with its slides.  
+  - `DELETE /api/presentations/[id]` – Remove a presentation and its slides.  
+
+- **Generation Route**
+  - `POST /api/presentations/generate` – Accepts a prompt from the client, calls the Gemini AI SDK in `lib/gemini.ts`, parses the JSON slide output, writes records to both `presentations` and `slides`, and returns the new presentation ID.
+
+Each route checks the user’s session, validates input with a library like Zod, and returns clear HTTP statuses with JSON responses.
+
+---
 
 ## 5. Hosting Solutions
 
-- **Cloud Provider**:  
-  - **Vercel** (recommended) offers seamless Next.js deployments, auto-scaling, and built-in CDN.  
-  - Alternatively, **Netlify** or any Node.js-capable host will work.
+- **Backend & Frontend:** Vercel serverless platform.  
+  - Automatic scaling: functions spin up on demand.  
+  - Global CDN: static assets and pages are cached at edge locations.  
+  - Zero-config deployments from the Git repo.  
 
-- **Benefits**
-  - **Reliability**: Global servers and failover across regions.  
-  - **Scalability**: Auto-scale serverless functions based on traffic.  
-  - **Cost-Effectiveness**: Pay-per-use model means low cost for small projects.
+- **Database:** Hosted on a managed PostgreSQL instance (for example, AWS RDS or Neon).
+  - Automated backups and point-in-time restores.  
+  - High availability via PostgreSQL replicas if needed.  
+
+This combination keeps operational overhead low while ensuring reliability and cost-effective scaling.
+
+---
 
 ## 6. Infrastructure Components
 
-- **Load Balancer**
-  - Provided by the hosting platform—distributes API requests across function instances.
+- **Load Balancing & Edge Network**
+  - Vercel automatically routes traffic through its global edge network, distributing load and reducing latency.
 
-- **CDN (Content Delivery Network)**
-  - Vercel’s global edge network caches static assets (CSS, JS, images) for faster page loads.
+- **Cache Control**
+  - Next.js routes and assets use HTTP headers (`Cache-Control`, `stale-while-revalidate`) to speed up repeat visits.
 
-- **Caching**
-  - **Redis** (optional) for session storage or caching dashboard queries to reduce database load.
+- **Database Connection Pooling**
+  - Managed within each serverless function to avoid exhausting connections in burst traffic.
 
-- **Object Storage**
-  - For file uploads or backups, integrate with AWS S3 or similar services.
+- **Content Delivery Network (CDN)**
+  - Vercel’s built-in CDN serves static assets (images, CSS, JS) close to users worldwide.
 
-- **Message Queue**
-  - In future, use **RabbitMQ** or **Kafka** for background tasks (e.g., email notifications).
+---
 
 ## 7. Security Measures
 
 - **Authentication & Authorization**
-  - Passwords hashed with **bcrypt** and salted.  
-  - Session tokens stored in secure, HttpOnly cookies or Authorization headers.  
-  - Protected endpoints verify tokens before proceeding.
+  - Better Auth handles secure user sessions with HTTP-only cookies.  
+  - Protected API routes reject unauthorized requests with a 401 status.  
 
 - **Data Encryption**
-  - **HTTPS/TLS** encrypts data in transit.  
-  - Database connections use SSL to encrypt data between the app and the database.
+  - TLS everywhere: all traffic to Vercel and PostgreSQL is encrypted in transit.  
+  - At-rest encryption is managed by the database host.  
+
+- **Environment Variables**
+  - Secrets (DB URL, Gemini API key) live in Vercel’s encrypted settings, never in code.
 
 - **Input Validation**
-  - Every incoming request is validated (e.g., valid email format, password length) to prevent SQL injection or other attacks.
+  - We use Zod schemas in API routes to guard against malformed or malicious data.  
 
-- **Web Security Best Practices**
-  - Enable **CORS** policies to limit allowed origins.  
-  - Use **CSRF tokens** or same-site cookies to prevent cross-site requests.  
-  - Set secure headers with **Helmet** or a similar middleware.
+- **Rate Limiting**
+  - To protect against abuse, the generation endpoint can limit requests per user or IP (using a simple in-memory or Redis-backed counter).
+
+---
 
 ## 8. Monitoring and Maintenance
 
+- **Logging & Error Tracking**
+  - Integrate Sentry (or Logflare) to capture unhandled errors and performance issues in our serverless functions.  
+
 - **Performance Monitoring**
-  - Integrate **Sentry** or **LogRocket** for real-time crash reporting and performance tracing.  
-  - Use Vercel’s built-in analytics to track request latencies and error rates.
+  - Vercel Analytics provides insight into edge function latency and cold start times.  
 
-- **Logging**
-  - Structured logs (JSON) for all API requests and errors, shipped to a log management service like **Datadog** or **Logflare**.
+- **Health Checks & Alerts**
+  - Uptime monitoring (e.g., Pingdom or Upptime) pings critical endpoints and notifies on failures.  
 
-- **Health Checks**
-  - Define a `/health` endpoint that returns a 200 status if the service is up and the database is reachable.
+- **Database Backups & Migrations**
+  - Automated daily backups for disaster recovery.  
+  - Drizzle migration scripts run during deploys to keep the schema in sync.
 
-- **Maintenance Strategies**
-  - Automated migrations run on deploy to keep the database schema up to date.  
-  - Scheduled dependency audits and security scans (e.g., `npm audit`).
-  - Regular backups of the database (daily or weekly depending on usage).
+- **Regular Updates**
+  - Dependabot or Renovate keeps dependencies up to date.  
+  - Scheduled reviews of third-party library advisories.
+
+---
 
 ## 9. Conclusion and Overall Backend Summary
 
-The backend for **codeguide-starter** is built on Next.js API Routes and Node.js, paired with PostgreSQL for data and optional Redis for caching. It follows a clear layered architecture that keeps code easy to maintain and extend. With RESTful endpoints for authentication and data, secure practices like password hashing and HTTPS, and hosting on Vercel for scalability and global performance, this setup meets the project’s goals for a fast, secure, and developer-friendly foundation. Future enhancements—such as background job queues, advanced monitoring, or richer data models—can be added without disrupting the core structure.
+Our backend blends Next.js serverless API routes with a managed PostgreSQL database to deliver a secure, scalable, and maintainable foundation for the AI Presentation Builder.  
+
+- We use a **BFF pattern** to centralize AI calls, database access, and authentication logic.  
+- **Drizzle ORM** ensures type safety and simple migrations for our SQL schema.  
+- Hosting on **Vercel** with a managed Postgres service provides reliability and low-touch operations.  
+- Infrastructure components like global CDNs, cache headers, and automated backups boost performance and resilience.  
+- Comprehensive security measures and monitoring tools keep user data safe and help us catch issues early.
+
+This structure aligns perfectly with the project goal: let developers focus on AI-powered slide generation while the backend handles the heavy lift of authentication, data storage, and reliable delivery.

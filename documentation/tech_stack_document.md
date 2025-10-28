@@ -1,90 +1,123 @@
-# Tech Stack Document
+# Tech Stack Document for AI Presentation Builder
 
-This document explains the key technologies chosen for the **codeguide-starter** project. It’s written in everyday language so anyone—technical or not—can understand why each tool was picked and how it supports the application.
+This document explains the technology choices behind the **AI Presentation Builder** starter template in plain language. It covers the frontend, backend, infrastructure, third-party services, security, performance, and a summary of how everything works together.
 
 ## 1. Frontend Technologies
-The frontend is everything the user sees and interacts with. For this project, we’ve used:
+
+We chose a modern set of tools to build a fast, responsive, and easy-to-use interface.
 
 - **Next.js (App Router)**
-  - A React framework that makes page routing, server-side rendering, and API routes very simple.
-  - Enhances user experience by pre-rendering pages on the server or at build time, leading to faster initial load.
-- **React 18**
-  - The underlying library for building user interfaces with reusable components.
-  - Provides a smooth, interactive experience thanks to its virtual DOM and modern hooks.
-- **TypeScript**
-  - A superset of JavaScript that adds types (labels for data).
-  - Helps catch errors early during development and makes the code easier to maintain.
-- **CSS (globals.css & theme.css)**
-  - **globals.css** applies base styles (fonts, colors, resets) across the entire app.
-  - **dashboard/theme.css** defines the look and feel specific to the dashboard area.
-  - This separation keeps styles organized and avoids accidental style conflicts.
+  - Provides the overall framework for pages, routing, and server-side logic.
+  - Supports React Server Components for fast initial load times.
+- **React & TypeScript**
+  - React makes building interactive UIs straightforward.
+  - TypeScript adds type checking to catch errors early and improve developer experience.
+- **Tailwind CSS**
+  - A utility-first CSS framework that speeds up styling by using small, reusable classes.
+  - Ensures a consistent look without writing custom CSS from scratch.
+- **Shadcn/ui**
+  - A ready-made component library (cards, inputs, buttons, carousels) built on Tailwind CSS.
+  - Lets us assemble polished UI elements quickly.
+- **next-themes**
+  - Adds built-in support for dark mode and easy theme switching.
+  - Uses CSS variables so we can one-click toggle between light/dark or future custom themes.
 
-By combining these tools, we have a clear structure (Next.js folders for pages and layouts), safer code (TypeScript), and flexible styling with vanilla CSS.
+**How these choices enhance UX:**
+- Fast initial page loads and smooth transitions (thanks to Next.js and React Server Components).
+- Consistent, polished styling with minimal effort (Tailwind + Shadcn/ui).
+- Built-in dark mode and easy theming to match user preferences.
+- TypeScript ensures fewer runtime errors, leading to a more stable interface.
 
 ## 2. Backend Technologies
-The backend handles data, user accounts, and the logic behind the scenes. Our choices here are:
+
+Our backend stack powers user management, data storage, and AI integration in a secure, scalable way.
 
 - **Next.js API Routes**
-  - Allows us to write server-side code (`route.ts` files) alongside our frontend in the same project.
-  - Runs on Node.js, so we can handle requests like sign-up, sign-in, and data fetching in one place.
-- **Node.js Runtime**
-  - The JavaScript environment on the server that executes our API routes.
-- **bcrypt** (npm package)
-  - A library for hashing passwords securely before storing them.
-  - Ensures that even if someone got access to our data, raw passwords aren’t visible.
-- **(Optional) NextAuth.js or JWT**
-  - While this starter kit shows a custom authentication flow, it can easily integrate services like NextAuth.js for email-based login or JWT (JSON Web Tokens) for stateless sessions.
+  - Serve as our backend endpoints (e.g., `/api/auth`, `/api/presentations/generate`).
+  - Keep server logic close to the frontend for simpler development.
+- **Better Auth**
+  - Handles user registration, login, logout, and session protection.
+  - Ensures only authenticated users can create and view presentations.
+- **PostgreSQL**
+  - A reliable, open-source relational database for storing users, presentations, and slides.
+- **Drizzle ORM**
+  - A type-safe database library that maps your TypeScript models to SQL tables.
+  - Makes it easy to read/write data without raw SQL and catches mistakes at compile time.
+- **Gemini AI SDK** (to be added)
+  - Provides a simple way to call Google’s Gemini AI from server code.
+  - Encapsulated in a dedicated service file (`/lib/gemini.ts`) to keep API keys safe.
 
-These components work together to receive user credentials, verify or store them securely, manage sessions or tokens, and deliver protected data back to the frontend.
+**How it all works together:**
+1. A user submits a prompt via the frontend form.  
+2. The Next.js API route `/api/presentations/generate` receives it.  
+3. The route calls the Gemini service to generate slide content.  
+4. Received data is parsed and saved to PostgreSQL through Drizzle ORM.  
+5. The route returns the new presentation ID for the frontend to display.
 
 ## 3. Infrastructure and Deployment
-Infrastructure covers where and how we host the app, as well as how changes get delivered:
 
+We chose tools that make local development, testing, and production deployment as smooth as possible.
+
+- **Docker**
+  - Provides a consistent local development environment.
+  - Ensures everyone on the team runs the same versions of Node, Postgres, etc.
+- **Vercel**
+  - Hosts the frontend and backend in one place, with automatic deployments on each push.
+  - Manages environment variables securely and scales servers as traffic grows.
 - **Git & GitHub**
-  - Version control system (Git) and remote hosting (GitHub) keep track of all code changes and allow team collaboration.
-- **Vercel (or Netlify)**
-  - A popular hosting service optimized for Next.js, with one-click deployments and global content delivery.
-  - Automatically rebuilds and deploys the site whenever code is pushed to the main branch.
-- **GitHub Actions (CI/CD)**
-  - Automates tasks like linting (ESLint), formatting (Prettier), and running any tests you add.
-  - Ensures that only clean, tested code goes live.
+  - Version control for tracking changes and collaborating.
+  - Pull requests and code reviews help maintain code quality.
+- **CI/CD**
+  - Vercel runs integration builds automatically.
+  - (Optional) GitHub Actions can run tests and lint checks before merging.
 
-Together, these tools provide a reliable, scalable setup where every code change is tested and deployed quickly, with minimal manual work.
+**Benefits:**
+- **Reliability:** Automated builds and deployments reduce human error.
+- **Scalability:** Vercel can spin up more instances when traffic increases.
+- **Developer efficiency:** Docker and Git workflows keep everyone in sync.
 
 ## 4. Third-Party Integrations
-While this starter kit is minimal by design, it already includes or can easily add:
 
-- **bcrypt**
-  - For secure password hashing (included as an npm dependency).
-- **NextAuth.js** (optional)
-  - A full-featured authentication library supporting email/password, OAuth, and more.
-- **Sentry or LogRocket** (optional)
-  - For real-time error tracking and performance monitoring in production.
+We integrate with external services that add core functionality without reinventing the wheel.
 
-These integrations help extend the app’s capabilities without building every feature from scratch.
+- **Better Auth**
+  - Outsources secure user authentication (registration, sessions, password reset).
+- **Gemini AI API**
+  - Leverages Google’s advanced AI to generate presentation content from prompts.
+- **Vercel Environment Variables**
+  - Securely store sensitive keys (database URL, Gemini API key) so they never appear in code.
+
+**How they enhance functionality:**
+- Speed up development by using battle-tested auth and AI services.
+- Keep sensitive operations (like AI calls and key management) safely on the server.
 
 ## 5. Security and Performance Considerations
-We’ve baked in several measures to keep users safe and the app running smoothly:
 
-Security:
-- Passwords are never stored in plain text—bcrypt hashes them with a random salt.
-- API routes can implement CSRF protection and input validation to block malicious requests.
-- Session tokens or cookies are marked secure and HttpOnly to prevent theft via JavaScript.
+We’ve put safeguards and optimizations in place to protect data and keep the app fast.
 
-Performance:
-- Server-side rendering (SSR) and static site generation (SSG) in Next.js deliver pages faster.
-- Code splitting and lazy-loaded components ensure users only download what they need.
-- Global CSS and theme files are small and cached by the browser for quick repeat visits.
-
-These strategies work together to give users a fast, secure experience every time.
+- **Authentication & Sessions**
+  - Managed by Better Auth, ensuring only legitimate users can access protected routes.
+- **Environment Variables**
+  - All secrets (API keys, database credentials) live in secure env files or Vercel’s secret store.
+- **Input Validation**
+  - We plan to use a library like Zod on the server side to validate prompts and prevent malicious data.
+- **Error Handling**
+  - API routes include try/catch logic and return clear error messages using UI alerts or toasts.
+- **Type Safety**
+  - TypeScript and Drizzle ORM catch mismatches at compile time, reducing runtime errors.
+- **Performance**
+  - React Server Components load only the data needed for each page.
+  - Tailwind’s utility classes lead to smaller CSS bundles.
+  - Next.js image and script optimizations ensure fast load times.
 
 ## 6. Conclusion and Overall Tech Stack Summary
-In building **codeguide-starter**, we chose technologies that:
 
-- Align with modern web standards (Next.js, React, TypeScript).
-- Provide a clear, file-based project structure for rapid onboarding.
-- Offer built-in support for server-side rendering, API routes, and static assets.
-- Emphasize security through password hashing, session management, and safe defaults.
-- Enable easy scaling and future enhancements via modular code and optional integrations.
+This tech stack is designed to get your AI-powered presentation platform up and running quickly, while ensuring long-term maintainability and scalability.
 
-This stack strikes a balance between simplicity for newcomers and flexibility for experienced teams. It accelerates development of a secure authentication flow and a polished dashboard, while leaving room to plug in databases, test suites, and advanced features as the project grows.
+- **Frontend:** Next.js, React, TypeScript, Tailwind CSS, Shadcn/ui, next-themes  
+- **Backend:** Next.js API routes, Better Auth, PostgreSQL, Drizzle ORM, Gemini AI SDK  
+- **Infrastructure:** Docker, Vercel, Git/GitHub, CI/CD  
+- **Integrations:** Better Auth for user management, Gemini AI for content generation  
+- **Security & Performance:** Environment variables, input validation, type safety, server-side rendering, optimized assets  
+
+These choices align with our goal of providing a **production-ready**, **developer-friendly** starter template for building a Gamma.app-style AI Presentation Builder. By leveraging modern frameworks, secure services, and best practices, we enable rapid development without sacrificing reliability or user experience.
