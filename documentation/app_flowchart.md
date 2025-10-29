@@ -1,14 +1,15 @@
 flowchart TD
-  Start[Landing Page]
-  SignUpPage[Sign Up Page]
-  SignInPage[Sign In Page]
-  AuthAPI[Authentication API Endpoint]
-  DashboardPage[Dashboard Page]
-  Start -->|Select Sign Up| SignUpPage
-  Start -->|Select Sign In| SignInPage
-  SignUpPage -->|Submit Credentials| AuthAPI
-  SignInPage -->|Submit Credentials| AuthAPI
-  AuthAPI -->|Success| DashboardPage
-  AuthAPI -->|Error| SignUpPage
-  AuthAPI -->|Error| SignInPage
-  DashboardPage -->|Click Logout| Start
+    Start[Start] --> AuthCheck[Check Authentication]
+    AuthCheck -- Authenticated --> Dashboard[Dashboard]
+    AuthCheck -- Not Authenticated --> Login[Login Page]
+    Login --> UserLogin[User Login]
+    UserLogin --> Dashboard[Dashboard]
+    Dashboard --> NewPres[New Presentation]
+    NewPres --> PromptForm[Prompt Input Form]
+    PromptForm --> SubmitPrompt[Submit Prompt]
+    SubmitPrompt --> ApiRoute[API Route Generate]
+    ApiRoute --> GeminiService[Gemini AI Service]
+    GeminiService --> SaveDB[Save To Database]
+    SaveDB --> ReturnID[Return Presentation ID]
+    ReturnID --> Redirect[Redirect to Viewer]
+    Redirect --> Viewer[Presentation Viewer Page]
